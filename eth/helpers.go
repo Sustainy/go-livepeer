@@ -131,5 +131,17 @@ func decodeTxParams(abi abi.ABI, v map[string]interface{}, data []byte) (map[str
 	if err := m.Inputs.UnpackIntoMap(v, data[4:]); err != nil {
 		return map[string]interface{}{}, err
 	}
+	for k, val := range v {
+		switch valTy := val.(type) {
+		case []byte:
+			v[k] = ethcommon.Bytes2Hex(valTy)
+		case ethcommon.Address:
+			v[k] = valTy.Hex()
+		case ethcommon.Hash:
+			v[k] = valTy.Hex()
+		default:
+
+		}
+	}
 	return v, nil
 }
