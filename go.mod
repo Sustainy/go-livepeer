@@ -31,16 +31,17 @@ require (
 	github.com/influxdata/influxdb v1.7.8 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.1 // indirect
 	github.com/karalabe/usb v0.0.0-20190919080040-51dc0efba356 // indirect
-	github.com/kr/pretty v0.1.0 // indirect
+	github.com/livepeer/joy4 v0.1.2-0.20191220171501-3d0cd11ebf39
 	github.com/livepeer/lpms v0.0.0-20200110164555-e34a4737b857
 	github.com/livepeer/m3u8 v0.11.0
+	github.com/livepeer/stream-tester v0.8.2
 	github.com/mattn/go-colorable v0.1.2 // indirect
 	github.com/mattn/go-sqlite3 v1.11.0
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
 	github.com/olekukonko/tablewriter v0.0.1
 	github.com/oschwald/maxminddb-golang v1.5.0 // indirect
 	github.com/pborman/uuid v1.2.0 // indirect
-	github.com/peterbourgon/ff v1.6.0 // indirect
+	github.com/peterbourgon/ff v1.6.0
 	github.com/peterh/liner v1.1.0 // indirect
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.1.0
@@ -59,7 +60,6 @@ require (
 	github.com/wsddn/go-ecdh v0.0.0-20161211032359-48726bab9208 // indirect
 	go.opencensus.io v0.22.1
 	golang.org/x/net v0.0.0-20190909003024-a7b16738d86b
-	google.golang.org/genproto v0.0.0-20190502173448-54afdca5d873 // indirect
 	google.golang.org/grpc v1.23.0
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
@@ -69,5 +69,7 @@ require (
 )
 
 replace gopkg.in/urfave/cli.v1 => github.com/urfave/cli v1.22.2-0.20191002033821-63cd2e3d6bb5
+
+replace github.com/livepeer/joy4 => github.com/livepeer/joy4 v0.1.2-0.20191220171501-3d0cd11ebf39
 
 // replace github.com/livepeer/lpms => /Users/dark/projects/livepeer/lpms
