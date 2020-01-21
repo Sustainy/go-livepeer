@@ -71,7 +71,11 @@ func (nv *NvidiaTranscoder) Transcode(job string, fname string, profiles []ffmpe
 	opts := profilesToTranscodeOptions(nv.workDir, ffmpeg.Nvidia, profiles)
 
 	// Do the Transcoding
+	start := time.Now()
 	res, err := nv.session.Transcode(in, opts)
+	took := time.Since(start)
+	glog.V(common.DEBUG).Infof("Transcoding of job=%s fname=%s on nvidia device=%v took=%v", job, fname, nv.device, took)
+
 	if err != nil {
 		return nil, err
 	}
