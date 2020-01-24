@@ -91,7 +91,7 @@ func (b *backend) SendTransaction(ctx context.Context, tx *types.Transaction) er
 	}
 
 	txParams := make(map[string]interface{})
-	txParams, err = decodeTxParams(b.abiMap[string(data[:4])], txParams, data)
+	err = decodeTxParams(b.abiMap[string(data[:4])], txParams, data)
 	if err != nil {
 		return err
 	}

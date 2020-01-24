@@ -3,6 +3,7 @@ package eth
 import (
 	"fmt"
 	"math/big"
+	"reflect"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -123,25 +124,66 @@ func fromPerc(perc float64, multiplier *big.Float) *big.Int {
 	return intRes
 }
 
-func decodeTxParams(abi abi.ABI, v map[string]interface{}, data []byte) (map[string]interface{}, error) {
+func decodeTxParams(abi abi.ABI, v map[string]interface{}, data []byte) error {
 	m, err := abi.MethodById(data[:4])
 	if err != nil {
-		return map[string]interface{}{}, err
+		return err
 	}
 	if err := m.Inputs.UnpackIntoMap(v, data[4:]); err != nil {
-		return map[string]interface{}{}, err
+		return err
 	}
 	for k, val := range v {
-		switch valTy := val.(type) {
-		case []byte:
-			v[k] = ethcommon.Bytes2Hex(valTy)
-		case ethcommon.Address:
-			v[k] = valTy.Hex()
-		case ethcommon.Hash:
-			v[k] = valTy.Hex()
-		default:
-
-		}
+		v[k] = ethTypeToStringyType(val)
 	}
-	return v, nil
+	return nil
+}
+
+func ethTypeToStringyType(v interface{}) interface{} {
+	val := reflect.Indirect(reflect.ValueOf(v))
+
+	switch vTy := val.Interface().(type) {
+	case []byte:
+		return "0x" + ethcommon.Bytes2Hex(vTy)
+	case ethcommon.Address:
+		return vTy.Hex()
+	case ethcommon.Hash:
+		return "0x" + vTy.Hex()
+	case big.Int:
+		return vTy.String()
+	default:
+		return handleComplexEthType(val)
+	}
+}
+
+func handleComplexEthType(val reflect.Value) interface{} {
+	switch val.Kind() {
+	// tuple
+	case reflect.Struct:
+		vString := "{"
+		for i := 0; i < val.NumField(); i++ {
+			vString += fmt.Sprintf(" %v", val.Type().Field(i).Name)
+			vString += ": "
+			vString += fmt.Sprintf("%v ", ethTypeToStringyType(val.Field(i).Interface()))
+		}
+		vString += "}"
+		return vString
+	case reflect.Array:
+		return handleEthSlice(val)
+	case reflect.Slice:
+		return handleEthSlice(val)
+	default:
+		return val.Interface()
+	}
+}
+
+func handleEthSlice(val reflect.Value) string {
+	if val.Kind() != reflect.Array || val.Kind() != reflect.Slice {
+		return ""
+	}
+	vString := "["
+	for i := 0; i < val.Len(); i++ {
+		vString += fmt.Sprintf(" %v ", ethTypeToStringyType(val.Field(i).Interface()))
+	}
+	vString += "]"
+	return vString
 }
