@@ -494,7 +494,7 @@ func (bm *benchmarker) Start(simultaneously int, wg *sync.WaitGroup) {
 		bm.sourceFileName, profiles2str(bm.profiles))
 	for stream := 0; stream < simultaneously; stream++ {
 		go func(iStream int) {
-			benchRes := doOneTranscode(bm.acceleration, bm.sourceFileName, bm.device, bm.workDir, bm.profiles, simultaneously, bm.doSegmenting)
+			benchRes := doOneTranscode(bm.acceleration, bm.sourceFileName, bm.device, bm.workDir, bm.profiles, simultaneously, bm.doSegmenting, bm.ignoreErrors)
 			benchRes.SimultaneousGPUs = bm.simultaneousGPUs
 			glog.Infof("Benchmark results (stream %d device %s):", iStream, bm.device)
 			glog.Info(benchRes.String())
