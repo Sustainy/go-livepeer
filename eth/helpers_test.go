@@ -1,13 +1,13 @@
 package eth
 
 import (
+	"fmt"
 	"math/big"
-	"strings"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/livepeer/go-livepeer/eth/contracts"
+	"github.com/livepeer/go-livepeer/pm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -46,7 +46,7 @@ func TestDecodeTxParams(t *testing.T) {
 	txParams := make(map[string]interface{})
 	depositAmount := "10000000000000000"
 	reserveAmount := "10000000000000000"
-	ticketBroker, err := abi.JSON(strings.NewReader(contracts.TicketBrokerABI))
+	ticketBroker, err := parseABI(contracts.TicketBrokerABI)
 	require.NoError(t, err)
 
 	err = decodeTxParams(ticketBroker, txParams, data)
@@ -60,7 +60,7 @@ func TestDecodeTxParams(t *testing.T) {
 	err = decodeTxParams(ticketBroker, txParams, data)
 
 	assert.Nil(err)
-	ticket := "{ Recipient: 0xa5E37e0BA14655e92DEff29F32adbc7D09b8a2cF  Sender: 0x3eE860A4abA830AF84EbBCE2b381fc11DB8493e2  FaceValue: 10000000000000000  WinProb: 11579208923731619542357098500868790785326998466564056403945759000000000000  SenderNonce: 14  RecipientRandHash:   AuxData: 0x0000000000000000000000000000000000000000000000000000000000000653f3b1d2925fd1325a8a6ba8923fbe6de31dd93d9e85540eaf5a306f21177c3b8c }"
+	ticket := "{ Recipient: 0xa5E37e0BA14655e92DEff29F32adbc7D09b8a2cF  Sender: 0x3eE860A4abA830AF84EbBCE2b381fc11DB8493e2  FaceValue: 10000000000000000  WinProb: 11579208923731619542357098500868790785326998466564056403945759000000000000  SenderNonce: 14  RecipientRandHash: 0x5309662eee5608da45aaefe60433adec052acab8683dd12d78aad8a0192b3bec  AuxData: 0x0000000000000000000000000000000000000000000000000000000000000653f3b1d2925fd1325a8a6ba8923fbe6de31dd93d9e85540eaf5a306f21177c3b8c }"
 	sig := "0x90cb8a9280386cc77e9f3473bb87530cf9a1dbe5625013a9ed16675ad7607c800bf4e32ee4cc6b9c785e1c786c9965831a8216c408b251f98d6c18bf1bf4d1621c"
 	recipientRand := "31838803992704255588716800748284438047369588248489535212488229909862636233406"
 	assert.Equal(txParams["_ticket"], ticket)
@@ -68,4 +68,36 @@ func TestDecodeTxParams(t *testing.T) {
 	assert.Equal(txParams["_recipientRand"], recipientRand)
 
 	// Batch redeem winning ticket (slice of tuples test)
+	ticketA := contracts.Struct1{
+		Recipient:         pm.RandAddress(),
+		Sender:            pm.RandAddress(),
+		FaceValue:         big.NewInt(5000000000),
+		WinProb:           big.NewInt(50000000),
+		SenderNonce:       big.NewInt(99999),
+		RecipientRandHash: pm.RandHash(),
+		AuxData:           pm.RandBytes(64),
+	}
+
+	ticketB := contracts.Struct1{
+		Recipient:         pm.RandAddress(),
+		Sender:            pm.RandAddress(),
+		FaceValue:         big.NewInt(5000000000),
+		WinProb:           big.NewInt(50000000),
+		SenderNonce:       big.NewInt(99999),
+		RecipientRandHash: pm.RandHash(),
+		AuxData:           pm.RandBytes(64),
+	}
+
+	sigs := [][]byte{pm.RandBytes(64), pm.RandBytes(64)}
+	recipientRands := []*big.Int{big.NewInt(111111), big.NewInt(222222)}
+
+	data, _ = ticketBroker.Pack("batchRedeemWinningTickets", []contracts.Struct1{ticketA, ticketB}, sigs, recipientRands)
+	err = decodeTxParams(ticketBroker, txParams, data)
+	assert.Nil(err)
+	ticketAS := fmt.Sprintf("{ Recipient: %v  Sender: %v  FaceValue: %v  WinProb: %v  SenderNonce: %v  RecipientRandHash: 0x%x  AuxData: 0x%v }", ticketA.Recipient.Hex(), ticketA.Sender.Hex(), ticketA.FaceValue.String(), ticketA.WinProb.String(), ticketA.SenderNonce.String(), ticketA.RecipientRandHash, ethcommon.Bytes2Hex(ticketA.AuxData))
+	ticketBS := fmt.Sprintf("{ Recipient: %v  Sender: %v  FaceValue: %v  WinProb: %v  SenderNonce: %v  RecipientRandHash: 0x%x  AuxData: 0x%v }", ticketB.Recipient.Hex(), ticketB.Sender.Hex(), ticketB.FaceValue.String(), ticketB.WinProb.String(), ticketB.SenderNonce.String(), ticketB.RecipientRandHash, ethcommon.Bytes2Hex(ticketB.AuxData))
+
+	assert.Equal(txParams["_tickets"], fmt.Sprintf("[ %v  %v ]", ticketAS, ticketBS))
+	assert.Equal(txParams["_sigs"], fmt.Sprintf("[ 0x%v  0x%v ]", ethcommon.Bytes2Hex(sigs[0]), ethcommon.Bytes2Hex(sigs[1])))
+	assert.Equal(txParams["_recipientRands"], fmt.Sprintf("[ %v  %v ]", recipientRands[0].String(), recipientRands[1].String()))
 }
