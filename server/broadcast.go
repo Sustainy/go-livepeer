@@ -210,6 +210,11 @@ func selectOrchestrator(n *core.LivepeerNode, params *streamParameters, cpl core
 		var balance Balance
 
 		ticketParams := pmTicketParams(tinfo.TicketParams)
+		ratPrice, err := common.RatPriceInfo(tinfo.PriceInfo)
+		if err != nil {
+			return sessions, err
+		}
+		ticketParams.PricePerPixel = ratPrice
 
 		if n.Sender != nil {
 			sessionID = n.Sender.StartSession(*ticketParams)
