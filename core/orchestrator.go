@@ -134,7 +134,8 @@ func (orch *orchestrator) ProcessPayment(payment net.Payment, manifestID Manifes
 		didReceiveErr          bool
 	)
 
-	err = orch.acceptablePrice(ethcommon.BytesToAddress(payment.Sender), payment.GetExpectedPrice())
+	priceInfo := payment.GetExpectedPrice()
+	err = orch.acceptablePrice(ethcommon.BytesToAddress(payment.Sender), priceInfo)
 	acceptablePriceErr, ok := err.(AcceptableError)
 	if err != nil {
 		glog.Error(err)
@@ -151,12 +152,20 @@ func (orch *orchestrator) ProcessPayment(payment net.Payment, manifestID Manifes
 
 	seed := new(big.Int).SetBytes(payment.TicketParams.Seed)
 
+	priceInfoRat, err := common.RatPriceInfo(priceInfo)
+	if err != nil {
+		glog.Error(err)
+		// TODO NICO: RETURN HERE?
+	}
+
 	ticketParams := &pm.TicketParams{
 		Recipient:         ethcommon.BytesToAddress(payment.TicketParams.Recipient),
 		FaceValue:         new(big.Int).SetBytes(payment.TicketParams.FaceValue),
 		WinProb:           new(big.Int).SetBytes(payment.TicketParams.WinProb),
 		RecipientRandHash: ethcommon.BytesToHash(payment.TicketParams.RecipientRandHash),
 		Seed:              seed,
+		ExpirationBlock:   new(big.Int).SetBytes(payment.TicketParams.ExpirationBlock),
+		PricePerPixel:     priceInfoRat,
 	}
 
 	ticketExpirationParams := &pm.TicketExpirationParams{
@@ -249,7 +258,16 @@ func (orch *orchestrator) TicketParams(sender ethcommon.Address) (*net.TicketPar
 		return nil, nil
 	}
 
-	params, err := orch.node.Recipient.TicketParams(sender)
+	price, err := orch.PriceInfo(sender)
+	if err != nil {
+		return nil, err
+	}
+	priceRat, err := common.RatPriceInfo(price)
+	if err != nil {
+		return nil, err
+	}
+
+	params, err := orch.node.Recipient.TicketParams(sender, priceRat)
 	if err != nil {
 		return nil, err
 	}
@@ -312,16 +330,19 @@ func (orch *orchestrator) DebitFees(addr ethcommon.Address, manifestID ManifestI
 
 // Acceptable price checks whether the payment sender's expected price sent with a payment is acceptable
 func (orch *orchestrator) acceptablePrice(sender ethcommon.Address, ep *net.PriceInfo) error {
-	if ep == nil || ep.GetPixelsPerUnit() <= 0 {
-		return fmt.Errorf("Expected price is not valid")
+	epRat, err := common.RatPriceInfo(ep)
+	if err != nil {
+		return err
 	}
-	epRat := big.NewRat(ep.GetPricePerUnit(), ep.GetPixelsPerUnit())
 
 	oPrice, err := orch.PriceInfo(sender)
 	if err != nil {
 		return err
 	}
-	oPriceRat := big.NewRat(oPrice.GetPricePerUnit(), oPrice.GetPixelsPerUnit())
+	oPriceRat, err := common.RatPriceInfo(oPrice)
+	if err != nil {
+		return err
+	}
 
 	// expected price is too small, check if sender is still within grace period
 	if epRat.Cmp(oPriceRat) < 0 {
