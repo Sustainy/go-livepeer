@@ -162,10 +162,18 @@ func (r *recipient) ReceiveTicket(ticket *Ticket, sig []byte, seed *big.Int) (st
 		}
 	}
 
+	if err := r.updateSenderNonce(recipientRand, ticket.SenderNonce); err != nil {
+		return sessionID, won, err
+	}
+
 	// check advertised params aren't expired
 	latestBlock := r.tm.LastSeenBlock()
 	if ticket.ParamsExpirationBlock.Cmp(latestBlock) < 0 {
 		return sessionID, won, ErrTicketParamsExpired
+	}
+
+	if !r.validRand(recipientRand) {
+		return sessionID, won, fmt.Errorf("recipientRand already revealed recipientRand=%v", recipientRand)
 	}
 
 	return sessionID, won, nil
@@ -219,6 +227,7 @@ func (r *recipient) TicketParams(sender ethcommon.Address, price *big.Rat) (*Tic
 		RecipientRandHash: recipientRandHash,
 		Seed:              seed,
 		ExpirationBlock:   expirationBlock,
+		PricePerPixel:     price,
 	}, nil
 }
 
@@ -468,7 +477,7 @@ func (r *recipient) redeemManager() {
 		select {
 		case ticket := <-r.sm.Redeemable():
 			if err := r.redeemWinningTicket(ticket.Ticket, ticket.Sig, ticket.RecipientRand); err != nil {
-				glog.Errorf("error retrying ticket sender=%x recipientRandHash=%x senderNonce=%v: %v", ticket.Sender, ticket.RecipientRandHash, ticket.SenderNonce, err)
+				glog.Errorf("error redeeming ticket - sender=%x recipientRandHash=%x senderNonce=%v err=%v", ticket.Sender, ticket.RecipientRandHash, ticket.SenderNonce, err)
 			}
 		case <-r.quit:
 			return
