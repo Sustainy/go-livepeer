@@ -79,8 +79,6 @@ type senderMonitor struct {
 	redeemable chan *SignedTicket
 
 	quit chan struct{}
-
-	em ErrorMonitor
 }
 
 // NewSenderMonitor returns a new SenderMonitor
@@ -95,7 +93,6 @@ func NewSenderMonitor(claimant ethcommon.Address, broker Broker, smgr SenderMana
 		senders:         make(map[ethcommon.Address]*remoteSender),
 		redeemable:      make(chan *SignedTicket),
 		quit:            make(chan struct{}),
-		em:              em,
 	}
 }
 
@@ -142,11 +139,6 @@ func (sm *senderMonitor) SubFloat(addr ethcommon.Address, amount *big.Int) {
 	// Adding to pendingAmount = subtracting from max float
 	pendingAmount := sm.senders[addr].pendingAmount
 	sm.senders[addr].pendingAmount.Add(pendingAmount, amount)
-
-	// Reset errCount for sender
-	// An updated max float results in updated ticket params
-	// The sender could plausibly send tickets that trigger acceptable errors
-	sm.em.ClearErrCount(addr)
 }
 
 // MaxFloat returns a remote sender's max float

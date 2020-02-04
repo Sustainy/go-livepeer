@@ -559,8 +559,6 @@ func TestProcessPayment_GivenRecipientError_ReturnsNil(t *testing.T) {
 	orch := NewOrchestrator(n, rm)
 	orch.address = addr
 	orch.node.SetBasePrice(big.NewRat(0, 1))
-	orch.node.ErrorMonitor = NewErrorMonitor(0, make(chan struct{}))
-
 	recipient.On("TxCostMultiplier", mock.Anything).Return(big.NewRat(1, 1), nil)
 
 	recipient.On("ReceiveTicket", mock.Anything, mock.Anything, mock.Anything).Return("", false, nil)
@@ -584,8 +582,6 @@ func TestProcessPayment_GivenNoSender_ReturnsError(t *testing.T) {
 
 	assert := assert.New(t)
 	assert.Error(err)
-	_, ok := err.(AcceptableError)
-	assert.False(ok)
 }
 
 func TestProcessPayment_GivenNoTicketParams_ReturnsNoError(t *testing.T) {
@@ -644,7 +640,6 @@ func TestProcessPayment_ActiveOrchestrator(t *testing.T) {
 	orch := NewOrchestrator(n, rm)
 	orch.address = addr
 	orch.node.SetBasePrice(big.NewRat(0, 1))
-	orch.node.ErrorMonitor = NewErrorMonitor(0, make(chan struct{}))
 
 	// orchestrator inactive -> error
 	err := orch.ProcessPayment(defaultPayment(t), ManifestID("some manifest"))
@@ -684,7 +679,6 @@ func TestProcessPayment_GivenLosingTicket_DoesNotRedeem(t *testing.T) {
 	orch := NewOrchestrator(n, rm)
 	orch.address = addr
 	orch.node.SetBasePrice(big.NewRat(0, 1))
-	orch.node.ErrorMonitor = NewErrorMonitor(0, make(chan struct{}))
 
 	recipient.On("TxCostMultiplier", mock.Anything).Return(big.NewRat(1, 1), nil)
 	recipient.On("ReceiveTicket", mock.Anything, mock.Anything, mock.Anything).Return("some sessionID", false, nil)
@@ -717,7 +711,6 @@ func TestProcessPayment_GivenWinningTicket_RedeemError(t *testing.T) {
 	orch := NewOrchestrator(n, rm)
 	orch.address = addr
 	orch.node.SetBasePrice(big.NewRat(0, 1))
-	orch.node.ErrorMonitor = NewErrorMonitor(0, make(chan struct{}))
 
 	manifestID := ManifestID("some manifest")
 	sessionID := "some sessionID"
@@ -758,7 +751,6 @@ func TestProcessPayment_GivenWinningTicket_Redeems(t *testing.T) {
 	orch := NewOrchestrator(n, rm)
 	orch.address = addr
 	orch.node.SetBasePrice(big.NewRat(0, 1))
-	orch.node.ErrorMonitor = NewErrorMonitor(0, make(chan struct{}))
 
 	manifestID := ManifestID("some manifest")
 	sessionID := "some sessionID"
@@ -799,7 +791,6 @@ func TestProcessPayment_GivenMultipleWinningTickets_RedeemsAll(t *testing.T) {
 	orch := NewOrchestrator(n, rm)
 	orch.address = addr
 	orch.node.SetBasePrice(big.NewRat(0, 1))
-	orch.node.ErrorMonitor = NewErrorMonitor(0, make(chan struct{}))
 
 	manifestID := ManifestID("some manifest")
 	sessionID := "some sessionID"
@@ -868,7 +859,6 @@ func TestProcessPayment_GivenConcurrentWinningTickets_RedeemsAll(t *testing.T) {
 	orch := NewOrchestrator(n, rm)
 	orch.address = addr
 	orch.node.SetBasePrice(big.NewRat(0, 1))
-	orch.node.ErrorMonitor = NewErrorMonitor(0, make(chan struct{}))
 
 	manifestIDs := make([]string, 5)
 
@@ -928,7 +918,6 @@ func TestProcessPayment_GivenReceiveTicketError_ReturnsError(t *testing.T) {
 	orch := NewOrchestrator(n, rm)
 	orch.address = addr
 	orch.node.SetBasePrice(big.NewRat(0, 1))
-	orch.node.ErrorMonitor = NewErrorMonitor(0, make(chan struct{}))
 
 	manifestID := ManifestID("some manifest")
 
@@ -954,14 +943,11 @@ func TestProcessPayment_GivenReceiveTicketError_ReturnsError(t *testing.T) {
 	time.Sleep(time.Millisecond * 20)
 	assert := assert.New(t)
 	assert.EqualError(err, "error receiving tickets with payment")
-	acceptableErr, ok := err.(AcceptableError)
-	assert.True(ok)
-	assert.False(acceptableErr.Acceptable())
 	recipient.AssertNumberOfCalls(t, "RedeemWinningTicket", 2)
 }
 
-// Check that an Acceptable error increases the credit
-func TestProcessPayment_AcceptablePaymentError_IncreasesCreditBalance(t *testing.T) {
+// Check that a payment error does NOT increase the credit
+func TestProcessPayment_PaymentError_DoesNotIncreaseCreditBalance(t *testing.T) {
 	addr := pm.RandAddress()
 	dbh, dbraw := tempDBWithOrch(t, &common.DBOrch{
 		EthereumAddr:      addr.Hex(),
@@ -981,124 +967,18 @@ func TestProcessPayment_AcceptablePaymentError_IncreasesCreditBalance(t *testing
 	orch := NewOrchestrator(n, rm)
 	orch.address = addr
 	orch.node.SetBasePrice(big.NewRat(0, 1))
-	orch.node.ErrorMonitor = NewErrorMonitor(0, make(chan struct{}))
 
 	manifestID := ManifestID("some manifest")
-	acceptableError := pm.NewMockReceiveError(errors.New("Acceptable ReceiveTicket error"), true)
+	paymentError := errors.New("ReceiveTicket error")
 
 	recipient.On("TxCostMultiplier", mock.Anything).Return(big.NewRat(1, 1), nil)
-	recipient.On("ReceiveTicket", mock.Anything, mock.Anything, mock.Anything).Return("", false, acceptableError).Once()
-	assert := assert.New(t)
-
-	// faceValue = 100
-	// winProb = 50%
-	maxWinProb := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(1))
-	ticket := &pm.Ticket{
-		FaceValue: big.NewInt(100),
-		WinProb:   maxWinProb.Div(maxWinProb, big.NewInt(2)),
-	}
-	payment := defaultPayment(t)
-	payment.TicketParams.FaceValue = ticket.FaceValue.Bytes()
-	payment.TicketParams.WinProb = ticket.WinProb.Bytes()
-
-	err := orch.ProcessPayment(payment, manifestID)
-	assert.Error(err)
-	acceptableErr, ok := err.(AcceptableError)
-	assert.True(ok)
-	assert.True(acceptableErr.Acceptable())
-	assert.Zero(orch.node.Balances.Balance(ethcommon.BytesToAddress(payment.Sender), manifestID).Cmp(ticket.EV()))
-}
-
-// Check that an unacceptable error does NOT increase the credit
-func TestProcessPayment_UnacceptablePaymentError_DoesNotIncreaseCreditBalance(t *testing.T) {
-	addr := pm.RandAddress()
-	dbh, dbraw := tempDBWithOrch(t, &common.DBOrch{
-		EthereumAddr:      addr.Hex(),
-		ActivationRound:   1,
-		DeactivationRound: 999,
-	})
-	defer dbh.Close()
-	defer dbraw.Close()
-
-	n, _ := NewLivepeerNode(nil, "", dbh)
-	n.Balances = NewAddressBalances(5 * time.Second)
-	recipient := new(pm.MockRecipient)
-	n.Recipient = recipient
-	rm := &stubRoundsManager{
-		round: big.NewInt(10),
-	}
-	orch := NewOrchestrator(n, rm)
-	orch.address = addr
-	orch.node.SetBasePrice(big.NewRat(0, 1))
-	orch.node.ErrorMonitor = NewErrorMonitor(0, make(chan struct{}))
-
-	manifestID := ManifestID("some manifest")
-	unacceptableError := pm.NewMockReceiveError(errors.New("Unacceptable ReceiveTicket error"), false)
-
-	recipient.On("TxCostMultiplier", mock.Anything).Return(big.NewRat(1, 1), nil)
-	recipient.On("ReceiveTicket", mock.Anything, mock.Anything, mock.Anything).Return("", false, unacceptableError).Once()
+	recipient.On("ReceiveTicket", mock.Anything, mock.Anything, mock.Anything).Return("", false, paymentError).Once()
 	assert := assert.New(t)
 
 	payment := defaultPayment(t)
 	err := orch.ProcessPayment(payment, manifestID)
 	assert.Error(err)
-	acceptableErr, ok := err.(AcceptableError)
-	assert.True(ok)
-	assert.False(acceptableErr.Acceptable())
 	assert.Nil(orch.node.Balances.Balance(ethcommon.BytesToAddress(payment.Sender), manifestID))
-}
-
-func TestProcesspayment_NoPriceError_IncreasesCredit(t *testing.T) {
-	addr := pm.RandAddress()
-	dbh, dbraw := tempDBWithOrch(t, &common.DBOrch{
-		EthereumAddr:      addr.Hex(),
-		ActivationRound:   1,
-		DeactivationRound: 999,
-	})
-	defer dbh.Close()
-	defer dbraw.Close()
-
-	n, _ := NewLivepeerNode(nil, "", dbh)
-	n.Balances = NewAddressBalances(5 * time.Second)
-	recipient := new(pm.MockRecipient)
-	n.Recipient = recipient
-	rm := &stubRoundsManager{
-		round: big.NewInt(10),
-	}
-	orch := NewOrchestrator(n, rm)
-	orch.address = addr
-	orch.node.SetBasePrice(big.NewRat(0, 1))
-	orch.node.ErrorMonitor = NewErrorMonitor(0, make(chan struct{}))
-
-	manifestID := ManifestID("some manifest")
-	sender := pm.RandAddress()
-
-	// This will multiply O's baseprice by 2
-	recipient.On("TxCostMultiplier", sender).Return(big.NewRat(1, 1), nil)
-	recipient.On("ReceiveTicket", mock.Anything, mock.Anything, mock.Anything).Return("", true, nil)
-	recipient.On("RedeemWinningTicket", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
-	assert := assert.New(t)
-
-	// faceValue = 100
-	// winProb = 50%
-	maxWinProb := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(1))
-	ticket := &pm.Ticket{
-		FaceValue: big.NewInt(100),
-		WinProb:   maxWinProb.Div(maxWinProb, big.NewInt(2)),
-	}
-	payment := defaultPayment(t)
-	payment.TicketParams.FaceValue = ticket.FaceValue.Bytes()
-	payment.TicketParams.WinProb = ticket.WinProb.Bytes()
-	payment.Sender = sender.Bytes()
-	payment.ExpectedPrice = &net.PriceInfo{
-		PricePerUnit:  10,
-		PixelsPerUnit: 1,
-	}
-
-	err := orch.ProcessPayment(payment, manifestID)
-	assert.Nil(err)
-	assert.Zero(orch.node.Balances.Balance(sender, manifestID).Cmp(ticket.EV()))
 }
 
 func TestIsActive(t *testing.T) {
@@ -1150,7 +1030,6 @@ func TestSufficientBalance_IsSufficient_ReturnsTrue(t *testing.T) {
 	orch := NewOrchestrator(n, rm)
 	orch.address = addr
 	orch.node.SetBasePrice(big.NewRat(0, 1))
-	orch.node.ErrorMonitor = NewErrorMonitor(0, make(chan struct{}))
 
 	manifestID := ManifestID("some manifest")
 
@@ -1189,7 +1068,6 @@ func TestSufficientBalance_IsNotSufficient_ReturnsFalse(t *testing.T) {
 	orch := NewOrchestrator(n, rm)
 	orch.address = addr
 	orch.node.SetBasePrice(big.NewRat(0, 1))
-	orch.node.ErrorMonitor = NewErrorMonitor(0, make(chan struct{}))
 
 	manifestID := ManifestID("some manifest")
 
