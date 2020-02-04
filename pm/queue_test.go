@@ -11,7 +11,7 @@ import (
 
 func defaultSignedTicket(senderNonce uint32) *SignedTicket {
 	return &SignedTicket{
-		&Ticket{FaceValue: big.NewInt(50), SenderNonce: senderNonce},
+		&Ticket{FaceValue: big.NewInt(50), SenderNonce: senderNonce, ParamsExpirationBlock: big.NewInt(0)},
 		[]byte("foo"),
 		big.NewInt(7),
 	}
@@ -50,7 +50,9 @@ func (qc *queueConsumer) Wait(num int, e RedeemableEmitter) {
 func TestTicketQueueLoop(t *testing.T) {
 	assert := assert.New(t)
 
-	q := newTicketQueue()
+	tm := &stubTimeManager{}
+
+	q := newTicketQueue(tm.SubscribeBlocks)
 	q.Start()
 	defer q.Stop()
 
@@ -64,16 +66,9 @@ func TestTicketQueueLoop(t *testing.T) {
 
 	assert.Equal(int32(numTickets), q.Length())
 
-	// Test signaling max float without removing tickets
-
-	q.SignalMaxFloat(big.NewInt(40))
-	q.SignalMaxFloat(big.NewInt(30))
-
 	// Length should not change since signaled max float is insufficient
 	time.Sleep(time.Millisecond * 20)
 	assert.Equal(int32(numTickets), q.Length())
-
-	// Test signaling max float and removing tickets
 
 	qc := &queueConsumer{}
 
@@ -81,12 +76,11 @@ func TestTicketQueueLoop(t *testing.T) {
 	// received on the output channel returned by Redeemable()
 	go qc.Wait(numTickets, q)
 
-	for i := 0; i < numTickets; i++ {
-		q.SignalMaxFloat(big.NewInt(60))
-	}
+	// Test signaling a new blockNum and remove tickets
+	tm.blockNumSink <- big.NewInt(1)
 
 	// Queue should be empty now
-	time.Sleep(time.Millisecond * 20)
+	time.Sleep(time.Second * 2)
 	assert.Equal(int32(0), q.Length())
 
 	// The popped tickets should be in the same order
@@ -98,48 +92,4 @@ func TestTicketQueueLoop(t *testing.T) {
 	for i := 0; i < numTickets; i++ {
 		assert.Equal(uint32(i), redeemable[i].SenderNonce)
 	}
-}
-
-func TestTicketQueueLoopConcurrent(t *testing.T) {
-	assert := assert.New(t)
-
-	q := newTicketQueue()
-	q.Start()
-	defer q.Stop()
-
-	// Initialize queue
-
-	numTickets := 5
-
-	for i := 0; i < numTickets; i++ {
-		q.Add(defaultSignedTicket(uint32(i)))
-	}
-
-	// Concurrently add tickets to the queue
-
-	numAdds := 2
-	for i := numTickets; i < numTickets+numAdds; i++ {
-		go q.Add(defaultSignedTicket(uint32(i)))
-	}
-
-	// Concurrently signal max floats that do not remove tickets from the queue
-
-	noRemoveSignals := 2
-	for i := 0; i < noRemoveSignals; i++ {
-		go q.SignalMaxFloat(big.NewInt(40))
-	}
-
-	// Concurrently signal max floats that remove tickets from the queue
-
-	removeSignals := 2
-	qc := &queueConsumer{}
-	go qc.Wait(removeSignals, q)
-
-	for i := 0; i < removeSignals; i++ {
-		go q.SignalMaxFloat(big.NewInt(60))
-	}
-
-	// Queue length should be unchanged
-	time.Sleep(time.Millisecond * 20)
-	assert.Equal(int32(numTickets), q.Length())
 }

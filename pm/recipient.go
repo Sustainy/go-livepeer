@@ -189,7 +189,8 @@ func (r *recipient) RedeemWinningTickets(sessionIDs []string) error {
 // RedeemWinningTicket redeems a single winning ticket
 func (r *recipient) RedeemWinningTicket(ticket *Ticket, sig []byte, seed *big.Int) error {
 	recipientRand := r.rand(seed, ticket.Sender, ticket.FaceValue, ticket.WinProb, ticket.ParamsExpirationBlock, ticket.PricePerPixel)
-	return r.redeemWinningTicket(ticket, sig, recipientRand)
+	r.sm.QueueTicket(ticket.Sender, &SignedTicket{ticket, sig, recipientRand})
+	return nil
 }
 
 // TicketParams returns the recipient's currently accepted ticket parameters
