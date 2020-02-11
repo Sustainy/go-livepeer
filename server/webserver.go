@@ -6,7 +6,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"net/http"
 	"net/url"
@@ -759,25 +758,18 @@ func (s *LivepeerServer) cliWebServerHandlers(bindAddr string) *http.ServeMux {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		if r.Method == "GET" {
+		level := r.URL.Query().Get("level")
+		if level == "" {
 			w.Header().Set("Content-Type", "application/json")
 			w.Write([]byte(vFlag.String()))
-		} else if r.Method == "PUT" {
-			defer r.Body.Close()
-			b, err := ioutil.ReadAll(r.Body)
-			if err != nil {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-			err = vFlag.Set(string(b))
-			if err != nil {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-			w.WriteHeader(http.StatusOK)
-		} else {
-			w.WriteHeader(http.StatusBadRequest)
+			return
 		}
+		err := vFlag.Set(level)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
 	})
 
 	mux.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
