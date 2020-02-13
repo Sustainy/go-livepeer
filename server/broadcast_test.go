@@ -1,9 +1,13 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"net/http"
+	"net/url"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -456,6 +460,112 @@ func TestCleanupSessions(t *testing.T) {
 //     assert an error from transcoder removes sess from BroadcastSessionManager
 //     assert a success re-adds sess to BroadcastSessionManager
 
+func TestTranscodeSegment_ExpiredParams_GetOrchestratorInfoAndRetry(t *testing.T) {
+	require := require.New(t)
+	assert := assert.New(t)
+
+	// Create stub server
+	ts, mux := stubTLSServer()
+	defer ts.Close()
+
+	tr := &net.TranscodeResult{
+		Info: &net.OrchestratorInfo{
+			Transcoder:   ts.URL,
+			PriceInfo:    &net.PriceInfo{PricePerUnit: 7, PixelsPerUnit: 7},
+			TicketParams: &net.TicketParams{ExpirationBlock: big.NewInt(100).Bytes()},
+		},
+		Result: &net.TranscodeResult_Data{
+			Data: &net.TranscodeData{
+				Segments: []*net.TranscodedSegmentData{&net.TranscodedSegmentData{Url: "test.flv"}},
+				Sig:      []byte("bar"),
+			},
+		},
+	}
+	buf, err := proto.Marshal(tr)
+	require.Nil(err)
+
+	mux.HandleFunc("/segment", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write(buf)
+	})
+
+	sess := StubBroadcastSession(ts.URL)
+	sender := &pm.MockSender{}
+	sess.Sender = sender
+	balance := &mockBalance{}
+	sess.Balance = balance
+	sess.Profiles = []ffmpeg.VideoProfile{ffmpeg.P144p30fps16x9}
+
+	cxn := &rtmpConnection{
+		mid:         core.ManifestID("foo"),
+		nonce:       7,
+		pl:          &stubPlaylistManager{manifestID: core.ManifestID("foo")},
+		profile:     &ffmpeg.P144p30fps16x9,
+		sessManager: bsmWithSessList([]*BroadcastSession{sess}),
+	}
+
+	// Expired Orchestrator Info -> GetOrchestratorInfo error -> Error
+	sender.On("EV", mock.Anything).Return(big.NewRat(1000000, 1), nil)
+	balance.On("StageUpdate", mock.Anything, mock.Anything).Return(1, big.NewRat(100, 1), big.NewRat(100, 1))
+	sender.On("CreateTicketBatch", mock.Anything, mock.Anything).Return(nil, pm.ErrTicketParamsExpired).Once()
+	balance.On("Credit", mock.Anything)
+	_, err = transcodeSegment(cxn, &stream.HLSSegment{Data: []byte("dummy"), Duration: 2.0}, "dummy", nil)
+	assert.True(strings.Contains(err.Error(), "unable to refresh ticketparams"))
+
+	// Expired Orchestrator Info -> GetOrchestratorInfo -> Still Expired -> Error
+	cxn = &rtmpConnection{
+		mid:         core.ManifestID("bar"),
+		nonce:       8,
+		pl:          &stubPlaylistManager{manifestID: core.ManifestID("bar")},
+		profile:     &ffmpeg.P144p30fps16x9,
+		sessManager: bsmWithSessList([]*BroadcastSession{sess}),
+	}
+
+	successOrchInfoUpdate := &net.OrchestratorInfo{
+		Transcoder: ts.URL,
+		PriceInfo: &net.PriceInfo{
+			PricePerUnit:  1,
+			PixelsPerUnit: 1,
+		},
+		TicketParams: &net.TicketParams{},
+	}
+
+	getOrchestratorInfoRPC = func(ctx context.Context, bcast common.Broadcaster, orchestratorServer *url.URL) (*net.OrchestratorInfo, error) {
+		return successOrchInfoUpdate, nil
+	}
+
+	sender.On("CreateTicketBatch", mock.Anything, mock.Anything).Return(nil, pm.ErrTicketParamsExpired).Twice()
+	_, err = transcodeSegment(cxn, &stream.HLSSegment{Data: []byte("dummy"), Duration: 2.0}, "dummy", nil)
+	assert.EqualError(err, pm.ErrTicketParamsExpired.Error())
+
+	// Expired Orchestrator Info -> GetOrchestratorInfo -> No Longer Expired -> Complete Session
+	cxn = &rtmpConnection{
+		mid:         core.ManifestID("baz"),
+		nonce:       9,
+		pl:          &stubPlaylistManager{manifestID: core.ManifestID("baz")},
+		profile:     &ffmpeg.P144p30fps16x9,
+		sessManager: bsmWithSessList([]*BroadcastSession{sess}),
+	}
+
+	sender.On("CreateTicketBatch", mock.Anything, mock.Anything).Return(nil, pm.ErrTicketParamsExpired).Once()
+	sender.On("CreateTicketBatch", mock.Anything, mock.Anything).Return(defaultTicketbatch(), nil).Once()
+	sender.On("StartSession", mock.Anything).Return("foo").Once()
+	_, err = transcodeSegment(cxn, &stream.HLSSegment{Data: []byte("dummy"), Duration: 2.0}, "dummy", nil)
+	assert.Nil(err)
+
+	completedSess := cxn.sessManager.sessMap[ts.URL]
+	assert.NotEqual(completedSess, sess)
+	assert.NotZero(completedSess.LatencyScore)
+
+	// Check that BroadcastSession.OrchestratorInfo was updated
+	completedSessInfo := cxn.sessManager.sessMap[tr.Info.Transcoder].OrchestratorInfo
+	assert.Equal(tr.Info.Transcoder, completedSessInfo.Transcoder)
+	assert.Equal(tr.Info.PriceInfo.PixelsPerUnit, completedSessInfo.PriceInfo.PixelsPerUnit)
+	assert.Equal(tr.Info.PriceInfo.PricePerUnit, completedSessInfo.PriceInfo.PricePerUnit)
+	assert.Equal(tr.Info.TicketParams.ExpirationBlock, completedSessInfo.TicketParams.ExpirationBlock)
+
+}
+
 func TestTranscodeSegment_CompleteSession(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
@@ -902,11 +1012,17 @@ func TestVerifier_HLSInsertion(t *testing.T) {
 			}()
 		}()
 		return &BroadcastSession{
-			Broadcaster:      stubBroadcaster2(),
-			ManifestID:       mid,
-			Profiles:         []ffmpeg.VideoProfile{ffmpeg.P144p30fps16x9},
-			BroadcasterOS:    mem,
-			OrchestratorInfo: &net.OrchestratorInfo{Transcoder: ts.URL},
+			Broadcaster:   stubBroadcaster2(),
+			ManifestID:    mid,
+			Profiles:      []ffmpeg.VideoProfile{ffmpeg.P144p30fps16x9},
+			BroadcasterOS: mem,
+			OrchestratorInfo: &net.OrchestratorInfo{
+				Transcoder: ts.URL,
+				PriceInfo: &net.PriceInfo{
+					PricePerUnit:  1,
+					PixelsPerUnit: 1,
+				},
+			},
 		}
 	}
 
@@ -944,4 +1060,21 @@ func TestVerifier_HLSInsertion(t *testing.T) {
 	_, err = transcodeSegment(cxn, seg, "dummy", verifier)
 	assert.Nil(err)
 	assert.Equal(baseURL+"/resp2", pl.uri)
+}
+
+func defaultTicketbatch() *pm.TicketBatch {
+	return &pm.TicketBatch{
+		TicketParams: &pm.TicketParams{
+			Recipient:       pm.RandAddress(),
+			FaceValue:       big.NewInt(1234),
+			WinProb:         big.NewInt(5678),
+			Seed:            big.NewInt(7777),
+			ExpirationBlock: big.NewInt(1000),
+		},
+		TicketExpirationParams: &pm.TicketExpirationParams{},
+		Sender:                 pm.RandAddress(),
+		SenderParams: []*pm.TicketSenderParams{
+			&pm.TicketSenderParams{SenderNonce: 777, Sig: pm.RandBytes(42)},
+		},
+	}
 }

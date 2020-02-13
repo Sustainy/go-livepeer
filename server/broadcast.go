@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -18,6 +19,7 @@ import (
 	"github.com/livepeer/go-livepeer/drivers"
 	"github.com/livepeer/go-livepeer/monitor"
 	"github.com/livepeer/go-livepeer/net"
+	"github.com/livepeer/go-livepeer/pm"
 	"github.com/livepeer/go-livepeer/verification"
 
 	"github.com/livepeer/lpms/stream"
@@ -25,6 +27,8 @@ import (
 
 var Policy *verification.Policy
 var BroadcastCfg = &BroadcastConfig{}
+
+var getOrchestratorInfoRPC = GetOrchestratorInfo
 
 type BroadcastConfig struct {
 	maxPrice *big.Rat
@@ -329,6 +333,7 @@ func transcodeSegment(cxn *rtmpConnection, seg *stream.HLSSegment, name string,
 		// similar to the orchestrator's RemoteTranscoderFatalError
 		return nil, nil
 	}
+
 	glog.Infof("Trying to transcode segment nonce=%d seqNo=%d", nonce, seg.SeqNo)
 	if monitor.Enabled {
 		monitor.TranscodeTry(nonce, seg.SeqNo)
@@ -352,13 +357,29 @@ func transcodeSegment(cxn *rtmpConnection, seg *stream.HLSSegment, name string,
 	// send segment to the orchestrator
 	glog.V(common.DEBUG).Infof("Submitting segment nonce=%d manifestID=%s seqNo=%d orch=%s", nonce, cxn.mid, seg.SeqNo, sess.OrchestratorInfo.Transcoder)
 
-	res, err := SubmitSegment(sess, seg, nonce)
-	if err != nil || res == nil {
-		cxn.sessManager.removeSession(sess)
-		if res == nil && err == nil {
-			return nil, errors.New("Empty response")
+	res, tErr := SubmitSegment(sess, seg, nonce)
+	// If TicketParams have expired, refresh them
+	if tErr != nil && tErr == pm.ErrTicketParamsExpired {
+		glog.V(common.VERBOSE).Infof("ticketparams expired, refreshing for orchestrator=%v", sess.OrchestratorInfo.Transcoder)
+		oURL, err := url.Parse(sess.OrchestratorInfo.Transcoder)
+		if err != nil {
+			cxn.sessManager.removeSession(sess)
+			return nil, fmt.Errorf("invalid orchestrator URL url=%v", sess.OrchestratorInfo.Transcoder)
 		}
-		return nil, err
+		oInfo, err := getOrchestratorInfoRPC(context.Background(), sess.Broadcaster, oURL)
+		if err != nil {
+			cxn.sessManager.removeSession(sess)
+			return nil, fmt.Errorf("unable to refresh ticketparams for orchestrator=%v, err=%v", sess.OrchestratorInfo.Transcoder, err)
+		}
+		sess.OrchestratorInfo = oInfo
+		res, tErr = SubmitSegment(sess, seg, nonce)
+	}
+	if tErr != nil || res == nil {
+		cxn.sessManager.removeSession(sess)
+		if res == nil && tErr == nil {
+			return nil, fmt.Errorf("unable to submit segment, removing session for orchestrator=%v err=%v", sess.OrchestratorInfo.Transcoder, tErr)
+		}
+		return nil, tErr
 	}
 
 	cxn.sessManager.completeSession(updateSession(sess, res))
@@ -460,7 +481,7 @@ func transcodeSegment(cxn *rtmpConnection, seg *stream.HLSSegment, name string,
 	}
 
 	for i, url := range segURLs {
-		err = cpl.InsertHLSSegment(&sess.Profiles[i], seg.SeqNo, url, seg.Duration)
+		err := cpl.InsertHLSSegment(&sess.Profiles[i], seg.SeqNo, url, seg.Duration)
 		if err != nil {
 			// InsertHLSSegment only returns ErrSegmentAlreadyExists error
 			// Right now InsertHLSSegment call is atomic regarding transcoded segments - we either inserting
