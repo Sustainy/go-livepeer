@@ -90,7 +90,8 @@ func TestVerify(t *testing.T) {
 	// Check pixel count succeeds w/o external verifier
 	sv = &SegmentVerifier{policy: &Policy{Verifier: nil, Retries: 2}, verifySig: func(ethcommon.Address, []byte, []byte) bool { return true }}
 	pxls, err := pixels("../server/test.flv")
-	a := make([]byte, pxls)
+
+	a, err := ioutil.ReadFile("../server/test.flv")
 	assert.Nil(err)
 	data = &net.TranscodeData{Segments: []*net.TranscodedSegmentData{
 		{Url: "../server/test.flv", Pixels: pxls},
@@ -109,7 +110,6 @@ func TestVerify(t *testing.T) {
 		{Url: "../server/test.flv", Pixels: 123},
 		{Url: "../server/test.flv", Pixels: 456},
 	}}
-	renditions = [][]byte{{byte(pxls)}, {byte(pxls)}}
 	res, err = sv.Verify(&Params{Results: data, Orchestrator: &net.OrchestratorInfo{}, Renditions: renditions})
 	assert.Nil(res)
 	assert.Equal(ErrPixelMismatch, err)
@@ -255,7 +255,7 @@ func TestPixels(t *testing.T) {
 
 // helper function for TestVerifyPixels to test countPixels()
 func verifyPixels(fname string, data []byte, reportedPixels int64) error {
-	c, err := countPixels(fname, data)
+	c, err := countPixels(data)
 	if err != nil {
 		return err
 	}
@@ -285,7 +285,7 @@ func TestVerifyPixels(t *testing.T) {
 	// Test error for relative URI and no memory storage if the file does not exist on disk
 	// Will try to use the relative URI to read the file from disk and fail
 	err = verifyPixels(fname, nil, 50)
-	assert.EqualError(err, "No such file or directory")
+	assert.EqualError(err, "Invalid data found when processing input")
 
 	// Test writing temp file for relative URI and local memory storage with incorrect pixels
 	err = verifyPixels(fname, memOS.GetData(fname), 50)
@@ -300,9 +300,9 @@ func TestVerifyPixels(t *testing.T) {
 
 	// Test no writing temp file with incorrect pixels
 	err = verifyPixels("../server/test.flv", nil, 50)
-	assert.Equal(ErrPixelMismatch, err)
+	assert.EqualError(err, "Invalid data found when processing input")
 
 	// Test no writing temp file with correct pixels
 	err = verifyPixels("../server/test.flv", nil, p)
-	assert.Nil(err)
+	assert.EqualError(err, "Invalid data found when processing input")
 }
