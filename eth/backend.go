@@ -69,10 +69,7 @@ func (b *backend) PendingNonceAt(ctx context.Context, account common.Address) (u
 }
 
 func (b *backend) SendTransaction(ctx context.Context, tx *types.Transaction) error {
-	err := b.Client.SendTransaction(ctx, tx)
-	if err != nil {
-		return err
-	}
+	sendErr := b.Client.SendTransaction(ctx, tx)
 
 	// update local nonce
 	msg, err := tx.AsMessage(types.HomesteadSigner{})
@@ -91,8 +88,7 @@ func (b *backend) SendTransaction(ctx context.Context, tx *types.Transaction) er
 	}
 
 	txParams := make(map[string]interface{})
-	err = decodeTxParams(b.abiMap[string(data[:4])], txParams, data)
-	if err != nil {
+	if err := decodeTxParams(b.abiMap[string(data[:4])], txParams, data); err != nil {
 		return err
 	}
 
@@ -101,9 +97,9 @@ func (b *backend) SendTransaction(ctx context.Context, tx *types.Transaction) er
 		txParamsString += fmt.Sprintf("%v: %v   ", name, val)
 	}
 
-	if err != nil {
+	if sendErr != nil {
 		glog.Infof("\n%vEth Transaction%v\n\nInvoking transaction: \"%v\".  Transaction Inputs: \"%v\"   \nTransaction Failed: %v\n\n%v\n", strings.Repeat("*", 30), strings.Repeat("*", 30), method, txParamsString, err, strings.Repeat("*", 75))
-		return err
+		return sendErr
 	}
 
 	glog.Infof("\n%vEth Transaction%v\n\nInvoking transaction: \"%v\". Transaction Inputs: \"%v\"  Hash: \"%v\". \n\n%v\n", strings.Repeat("*", 30), strings.Repeat("*", 30), method, txParamsString, tx.Hash().String(), strings.Repeat("*", 75))
