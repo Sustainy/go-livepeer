@@ -584,7 +584,7 @@ func TestProcessPayment_GivenNoSender_ReturnsError(t *testing.T) {
 	assert.Error(err)
 }
 
-func TestProcessPayment_GivenNoTicketParams_ReturnsNoError(t *testing.T) {
+func TestProcessPayment_GivenNoTicketParams_ReturnsNil(t *testing.T) {
 	n, _ := NewLivepeerNode(nil, "", nil)
 	recipient := new(pm.MockRecipient)
 	n.Recipient = recipient
@@ -601,7 +601,7 @@ func TestProcessPayment_GivenNoTicketParams_ReturnsNoError(t *testing.T) {
 	assert.Nil(err)
 }
 
-func TestProcessPayment_GivenNilNode_ReturnsNilError(t *testing.T) {
+func TestProcessPayment_GivenNilNode_ReturnsNil(t *testing.T) {
 	orch := &orchestrator{}
 
 	err := orch.ProcessPayment(defaultPayment(t), ManifestID("some manifest"))
@@ -609,7 +609,7 @@ func TestProcessPayment_GivenNilNode_ReturnsNilError(t *testing.T) {
 	assert.Nil(t, err)
 }
 
-func TestProcessPayment_GivenNilRecipient_ReturnsNilError(t *testing.T) {
+func TestProcessPayment_GivenNilRecipient_ReturnsNil(t *testing.T) {
 	n, _ := NewLivepeerNode(nil, "", nil)
 	orch := NewOrchestrator(n, nil)
 	n.Recipient = nil
@@ -657,6 +657,38 @@ func TestProcessPayment_ActiveOrchestrator(t *testing.T) {
 	recipient.On("ReceiveTicket", mock.Anything, mock.Anything, mock.Anything).Return("some sessionID", false, nil)
 	err = orch.ProcessPayment(defaultPayment(t), ManifestID("some manifest"))
 	assert.NoError(err)
+}
+
+func TestProcessPayment_InvalidExpectedPrice(t *testing.T) {
+	assert := assert.New(t)
+	addr := pm.RandAddress()
+	dbh, dbraw := tempDBWithOrch(t, &common.DBOrch{
+		EthereumAddr:      addr.Hex(),
+		ActivationRound:   1,
+		DeactivationRound: 999,
+	})
+	defer dbh.Close()
+	defer dbraw.Close()
+	n, _ := NewLivepeerNode(nil, "", dbh)
+	n.Recipient = new(pm.MockRecipient)
+	rm := &stubRoundsManager{
+		round: big.NewInt(10),
+	}
+	orch := NewOrchestrator(n, rm)
+	orch.address = addr
+	pay := defaultPayment(t)
+
+	// test ExpectedPrice = nil
+	pay.ExpectedPrice = nil
+	err := orch.ProcessPayment(pay, ManifestID("some manifest"))
+	assert.Error(err)
+	assert.EqualError(err, fmt.Sprintf("invalid expected price sent with payment - expectedPrice=%v err=%v", pay.ExpectedPrice, "priceInfo is nil"))
+
+	// test ExpectedPrice.PixelsPerUnit = 0
+	pay.ExpectedPrice = &net.PriceInfo{PricePerUnit: 500, PixelsPerUnit: 0}
+	err = orch.ProcessPayment(pay, ManifestID("some manifest"))
+	assert.Error(err)
+	assert.EqualError(err, fmt.Sprintf("invalid expected price sent with payment - expectedPrice=%v err=%v", pay.ExpectedPrice, "pixels per unit is 0"))
 }
 
 func TestProcessPayment_GivenLosingTicket_DoesNotRedeem(t *testing.T) {

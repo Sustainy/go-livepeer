@@ -261,12 +261,12 @@ func ToInt64(val *big.Int) int64 {
 
 func RatPriceInfo(priceInfo *net.PriceInfo) (*big.Rat, error) {
 	if priceInfo == nil {
-		return nil, nil
+		return nil, errors.New("priceInfo is nil")
 	}
 
 	pixelsPerUnit := priceInfo.PixelsPerUnit
 	if pixelsPerUnit == 0 {
-		return nil, errors.New("invalid priceInfo.pixelsPerUnit")
+		return nil, errors.New("pixels per unit is 0")
 	}
 
 	return big.NewRat(priceInfo.PricePerUnit, pixelsPerUnit), nil

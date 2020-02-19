@@ -133,8 +133,7 @@ func (orch *orchestrator) ProcessPayment(payment net.Payment, manifestID Manifes
 
 	priceInfoRat, err := common.RatPriceInfo(priceInfo)
 	if err != nil {
-		glog.Error(err)
-		// TODO NICO: RETURN HERE?
+		return fmt.Errorf("invalid expected price sent with payment - expectedPrice=%v err=%v", priceInfo, err)
 	}
 
 	ticketParams := &pm.TicketParams{
