@@ -29,11 +29,7 @@ type Retryable struct {
 	error
 }
 
-type Fatal struct {
-	Retryable
-}
-
-var ErrPixelMismatch = Fatal{Retryable{errors.New("PixelMismatch")}}
+var ErrPixelMismatch = Retryable{errors.New("PixelMismatch")}
 var ErrPixelsAbsent = errors.New("PixelsAbsent")
 var errPMCheckFailed = errors.New("PM Check Failed")
 
@@ -150,9 +146,9 @@ func (sv *SegmentVerifier) Verify(params *Params) (*Params, error) {
 	}
 	sv.count++
 
-	// Append non-fatal retryable errors to results
+	// Append retryable errors to results
 	// The caller should terminate processing for non-retryable errors
-	if !IsFatal(err) && IsRetryable(err) {
+	if IsRetryable(err) {
 		r := SegmentVerifierResults{params: params, res: res}
 		sv.results = append(sv.results, r)
 	}
@@ -170,14 +166,9 @@ func (sv *SegmentVerifier) Verify(params *Params) (*Params, error) {
 	return nil, err
 }
 
-func IsFatal(err error) bool {
-	_, fatal := err.(Fatal)
-	return fatal
-}
-
 func IsRetryable(err error) bool {
 	_, retryable := err.(Retryable)
-	return retryable || IsFatal(err)
+	return retryable
 }
 
 func (sv *SegmentVerifier) sigVerification(params *Params) error {
