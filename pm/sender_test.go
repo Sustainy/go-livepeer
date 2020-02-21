@@ -405,9 +405,15 @@ func TestValidateTicketParams_ExpiredParams_ReturnsError(t *testing.T) {
 	sender.maxEV = big.NewRat(100, 1)
 	sender.depositMultiplier = 2
 
+	// test expired
 	ticketParams := defaultTicketParams(t, RandAddress())
 	ticketParams.ExpirationBlock = big.NewInt(int64(-1))
 	err := sender.ValidateTicketParams(&ticketParams)
+	assert.EqualError(t, err, ErrTicketParamsExpired.Error())
+
+	// test nil
+	ticketParams.ExpirationBlock = nil
+	err = sender.ValidateTicketParams(&ticketParams)
 	assert.EqualError(t, err, ErrTicketParamsExpired.Error())
 }
 

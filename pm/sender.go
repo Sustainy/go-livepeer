@@ -155,7 +155,7 @@ func (s *sender) validateTicketParams(ticketParams *TicketParams, numTickets int
 	}
 
 	latestBlock := s.timeManager.LastSeenBlock()
-	if ticketParams.ExpirationBlock.Cmp(latestBlock) < 0 {
+	if ticketParams.ExpirationBlock == nil || ticketParams.ExpirationBlock.Cmp(latestBlock) < 0 {
 		return ErrTicketParamsExpired
 	}
 
