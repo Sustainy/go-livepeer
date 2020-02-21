@@ -210,17 +210,19 @@ func selectOrchestrator(n *core.LivepeerNode, params *streamParameters, cpl core
 	var sessions []*BroadcastSession
 
 	for _, tinfo := range tinfos {
-		var sessionID string
-		var balance Balance
-
-		ticketParams := pmTicketParams(tinfo.TicketParams)
-		ratPrice, err := common.RatPriceInfo(tinfo.PriceInfo)
-		if err != nil {
-			return sessions, err
-		}
-		ticketParams.PricePerPixel = ratPrice
+		var (
+			sessionID    string
+			balance      Balance
+			ticketParams *pm.TicketParams
+		)
 
 		if n.Sender != nil {
+			ticketParams = pmTicketParams(tinfo.TicketParams)
+			ratPrice, err := common.RatPriceInfo(tinfo.PriceInfo)
+			if err != nil {
+				return sessions, err
+			}
+			ticketParams.PricePerPixel = ratPrice
 			sessionID = n.Sender.StartSession(*ticketParams)
 		}
 
@@ -375,6 +377,7 @@ func transcodeSegment(cxn *rtmpConnection, seg *stream.HLSSegment, name string,
 		res, tErr = SubmitSegment(sess, seg, nonce)
 	}
 	if tErr != nil || res == nil {
+		glog.Infof("unable to submit segment, removing session for orchestrator=%v err=%v", sess.OrchestratorInfo.Transcoder, tErr)
 		cxn.sessManager.removeSession(sess)
 		if res == nil && tErr == nil {
 			return nil, fmt.Errorf("unable to submit segment, removing session for orchestrator=%v err=%v", sess.OrchestratorInfo.Transcoder, tErr)
