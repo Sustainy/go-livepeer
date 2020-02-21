@@ -890,9 +890,15 @@ func TestTicketParams(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
 
+	// Test TimeManager.LastSeenBlock error
+	tm.lastSeenBlock = nil
+	_, err := r.TicketParams(sender, big.NewRat(1, 1))
+	assert.EqualError(err, "unable to get last seen block number")
+	tm.lastSeenBlock = big.NewInt(1)
+
 	// Test SenderMonitor.MaxFloat() error
 	sm.maxFloatErr = errors.New("MaxFloat error")
-	_, err := r.TicketParams(sender, big.NewRat(1, 1))
+	_, err = r.TicketParams(sender, big.NewRat(1, 1))
 	assert.EqualError(err, sm.maxFloatErr.Error())
 
 	// Test correct params returned when default faceValue < maxFloat

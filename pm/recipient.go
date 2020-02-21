@@ -215,6 +215,9 @@ func (r *recipient) TicketParams(sender ethcommon.Address, price *big.Rat) (*Tic
 	}
 
 	lastBlock := r.tm.LastSeenBlock()
+	if lastBlock == nil {
+		return nil, fmt.Errorf("unable to get last seen block number")
+	}
 	expirationBlock := lastBlock.Add(lastBlock, paramsExpirationTime)
 
 	winProb := r.winProb(faceValue)
