@@ -678,15 +678,9 @@ func TestProcessPayment_InvalidExpectedPrice(t *testing.T) {
 	orch.address = addr
 	pay := defaultPayment(t)
 
-	// test ExpectedPrice = nil
-	pay.ExpectedPrice = nil
-	err := orch.ProcessPayment(pay, ManifestID("some manifest"))
-	assert.Error(err)
-	assert.EqualError(err, fmt.Sprintf("invalid expected price sent with payment - expectedPrice=%v err=%v", pay.ExpectedPrice, "priceInfo is nil"))
-
 	// test ExpectedPrice.PixelsPerUnit = 0
 	pay.ExpectedPrice = &net.PriceInfo{PricePerUnit: 500, PixelsPerUnit: 0}
-	err = orch.ProcessPayment(pay, ManifestID("some manifest"))
+	err := orch.ProcessPayment(pay, ManifestID("some manifest"))
 	assert.Error(err)
 	assert.EqualError(err, fmt.Sprintf("invalid expected price sent with payment - expectedPrice=%v err=%v", pay.ExpectedPrice, "pixels per unit is 0"))
 }
