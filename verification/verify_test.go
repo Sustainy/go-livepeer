@@ -298,7 +298,7 @@ func TestVerifyPixels(t *testing.T) {
 	err = verifyPixels(fname, memOS.GetData(fname), p)
 	assert.Nil(err)
 
-	// Test no writing temp file with incorrect pixels
+	// Test nil data
 	err = verifyPixels("../server/test.flv", nil, 50)
 	assert.EqualError(err, "Invalid data found when processing input")
 }
