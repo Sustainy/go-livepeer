@@ -226,6 +226,10 @@ func BaseTokenAmountToFixed(baseAmount *big.Int) (int64, error) {
 	return ratToFixed(rat, 100000)
 }
 
+func FixedToPrice(price, scalingFactor int64) *big.Rat {
+	return big.NewRat(price, scalingFactor)
+}
+
 func ratToFixed(rat *big.Rat, scalingFactor int64) (int64, error) {
 	if rat == nil {
 		return 0, fmt.Errorf("reference to rat is nil")
