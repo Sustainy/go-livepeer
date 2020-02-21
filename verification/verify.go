@@ -148,7 +148,7 @@ func (sv *SegmentVerifier) Verify(params *Params) (*Params, error) {
 
 	// Append retryable errors to results
 	// The caller should terminate processing for non-retryable errors
-	if IsRetryable(err) {
+	if err != ErrAudioMismatch && IsRetryable(err) {
 		r := SegmentVerifierResults{params: params, res: res}
 		sv.results = append(sv.results, r)
 	}

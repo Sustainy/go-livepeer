@@ -217,6 +217,12 @@ func TestVerify(t *testing.T) {
 	assert.Equal(ErrPixelsAbsent, err)
 	assert.Equal("mno", string(res.ManifestID)) // Still return best result
 
+	// A high score should still fail if pixel checking fails
+	verifier.results = &Results{Score: 21.0, Pixels: []int64{-1, -2}}
+	res, err = sv.Verify(&Params{ManifestID: "vws", Results: data})
+	assert.Equal(ErrPixelMismatch, err)
+	assert.Equal("mno", string(res.ManifestID))
+
 	// Check *not* retryable; should never get a result
 	sv = NewSegmentVerifier(&Policy{Verifier: verifier, Retries: 1}) // reset
 	verifier.err = errors.New("Stub Verifier Non-Retryable Error")
