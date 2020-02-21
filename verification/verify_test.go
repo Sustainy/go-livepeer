@@ -301,8 +301,4 @@ func TestVerifyPixels(t *testing.T) {
 	// Test no writing temp file with incorrect pixels
 	err = verifyPixels("../server/test.flv", nil, 50)
 	assert.EqualError(err, "Invalid data found when processing input")
-
-	// Test no writing temp file with correct pixels
-	err = verifyPixels("../server/test.flv", nil, p)
-	assert.EqualError(err, "Invalid data found when processing input")
 }
