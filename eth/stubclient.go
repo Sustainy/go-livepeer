@@ -41,6 +41,8 @@ type MockClient struct {
 	*StubClient
 }
 
+func (m *MockClient) SendEth(amount *big.Int, to ethcommon.Address) error { return nil }
+
 // BondingManager
 
 // TranscoderPool returns a list of registered transcoders
@@ -179,6 +181,8 @@ type StubClient struct {
 type stubTranscoder struct {
 	ServiceURI string
 }
+
+func (e *StubClient) SendEth(amount *big.Int, to ethcommon.Address) error { return nil }
 
 func (e *StubClient) Setup(password string, gasLimit uint64, gasPrice *big.Int) error { return nil }
 func (e *StubClient) Account() accounts.Account                                       { return accounts.Account{Address: e.TranscoderAddress} }

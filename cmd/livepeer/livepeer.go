@@ -544,6 +544,16 @@ func main() {
 			rs := eventservices.NewRewardService(n.Eth, blockPollingTime)
 			rs.Start(ctx)
 			defer rs.Stop()
+
+			if !*transcoder {
+				n.TranscoderManager = core.NewRemoteTranscoderManager(n, roundsWatcher.Subscribe)
+				n.Transcoder = n.TranscoderManager
+			}
+			// Start Transcoder Pool payout loop
+			if n.TranscoderManager != nil {
+				go n.TranscoderManager.StartPayoutLoop()
+				defer n.TranscoderManager.StopPayoutLoop()
+			}
 		}
 
 		if n.NodeType == core.BroadcasterNode {

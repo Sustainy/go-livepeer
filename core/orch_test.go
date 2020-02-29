@@ -34,7 +34,7 @@ func TestCurrentBlock(t *testing.T) {
 		t.Error(err)
 	}
 	defer os.RemoveAll(tmpdir)
-	rm := &stubRoundsManager{}
+	rm := &common.StubRoundsManager{}
 	orch := NewOrchestrator(n, rm)
 
 	// test empty db
@@ -581,8 +581,8 @@ func TestProcessPayment_GivenRecipientError_ReturnsNil(t *testing.T) {
 	n.Balances = NewAddressBalances(5 * time.Second)
 	recipient := new(pm.MockRecipient)
 	n.Recipient = recipient
-	rm := &stubRoundsManager{
-		round: big.NewInt(10),
+	rm := &common.StubRoundsManager{
+		Round: big.NewInt(10),
 	}
 	orch := NewOrchestrator(n, rm)
 	orch.address = addr
@@ -666,8 +666,8 @@ func TestProcessPayment_ActiveOrchestrator(t *testing.T) {
 	n.Balances = NewAddressBalances(5 * time.Second)
 	recipient := new(pm.MockRecipient)
 	n.Recipient = recipient
-	rm := &stubRoundsManager{
-		round: big.NewInt(10),
+	rm := &common.StubRoundsManager{
+		Round: big.NewInt(10),
 	}
 	orch := NewOrchestrator(n, rm)
 	orch.address = addr
@@ -706,8 +706,8 @@ func TestProcessPayment_GivenLosingTicket_DoesNotRedeem(t *testing.T) {
 	n.Balances = NewAddressBalances(5 * time.Second)
 	recipient := new(pm.MockRecipient)
 	n.Recipient = recipient
-	rm := &stubRoundsManager{
-		round: big.NewInt(10),
+	rm := &common.StubRoundsManager{
+		Round: big.NewInt(10),
 	}
 	orch := NewOrchestrator(n, rm)
 	orch.address = addr
@@ -739,8 +739,8 @@ func TestProcessPayment_GivenWinningTicket_RedeemError(t *testing.T) {
 	n.Balances = NewAddressBalances(5 * time.Second)
 	recipient := new(pm.MockRecipient)
 	n.Recipient = recipient
-	rm := &stubRoundsManager{
-		round: big.NewInt(10),
+	rm := &common.StubRoundsManager{
+		Round: big.NewInt(10),
 	}
 	orch := NewOrchestrator(n, rm)
 	orch.address = addr
@@ -780,8 +780,8 @@ func TestProcessPayment_GivenWinningTicket_Redeems(t *testing.T) {
 	n.Balances = NewAddressBalances(5 * time.Second)
 	recipient := new(pm.MockRecipient)
 	n.Recipient = recipient
-	rm := &stubRoundsManager{
-		round: big.NewInt(10),
+	rm := &common.StubRoundsManager{
+		Round: big.NewInt(10),
 	}
 	orch := NewOrchestrator(n, rm)
 	orch.address = addr
@@ -821,8 +821,8 @@ func TestProcessPayment_GivenMultipleWinningTickets_RedeemsAll(t *testing.T) {
 	n.Balances = NewAddressBalances(5 * time.Second)
 	recipient := new(pm.MockRecipient)
 	n.Recipient = recipient
-	rm := &stubRoundsManager{
-		round: big.NewInt(10),
+	rm := &common.StubRoundsManager{
+		Round: big.NewInt(10),
 	}
 	orch := NewOrchestrator(n, rm)
 	orch.address = addr
@@ -891,8 +891,8 @@ func TestProcessPayment_GivenConcurrentWinningTickets_RedeemsAll(t *testing.T) {
 	n.Balances = NewAddressBalances(5 * time.Second)
 	recipient := new(pm.MockRecipient)
 	n.Recipient = recipient
-	rm := &stubRoundsManager{
-		round: big.NewInt(10),
+	rm := &common.StubRoundsManager{
+		Round: big.NewInt(10),
 	}
 	orch := NewOrchestrator(n, rm)
 	orch.address = addr
@@ -951,8 +951,8 @@ func TestProcessPayment_GivenReceiveTicketError_ReturnsError(t *testing.T) {
 	n.Balances = NewAddressBalances(5 * time.Second)
 	recipient := new(pm.MockRecipient)
 	n.Recipient = recipient
-	rm := &stubRoundsManager{
-		round: big.NewInt(10),
+	rm := &common.StubRoundsManager{
+		Round: big.NewInt(10),
 	}
 	orch := NewOrchestrator(n, rm)
 	orch.address = addr
@@ -1004,8 +1004,8 @@ func TestProcessPayment_AcceptablePaymentError_IncreasesCreditBalance(t *testing
 	n.Balances = NewAddressBalances(5 * time.Second)
 	recipient := new(pm.MockRecipient)
 	n.Recipient = recipient
-	rm := &stubRoundsManager{
-		round: big.NewInt(10),
+	rm := &common.StubRoundsManager{
+		Round: big.NewInt(10),
 	}
 	orch := NewOrchestrator(n, rm)
 	orch.address = addr
@@ -1053,8 +1053,8 @@ func TestProcessPayment_UnacceptablePaymentError_DoesNotIncreaseCreditBalance(t 
 	n.Balances = NewAddressBalances(5 * time.Second)
 	recipient := new(pm.MockRecipient)
 	n.Recipient = recipient
-	rm := &stubRoundsManager{
-		round: big.NewInt(10),
+	rm := &common.StubRoundsManager{
+		Round: big.NewInt(10),
 	}
 	orch := NewOrchestrator(n, rm)
 	orch.address = addr
@@ -1091,8 +1091,8 @@ func TestProcesspayment_NoPriceError_IncreasesCredit(t *testing.T) {
 	n.Balances = NewAddressBalances(5 * time.Second)
 	recipient := new(pm.MockRecipient)
 	n.Recipient = recipient
-	rm := &stubRoundsManager{
-		round: big.NewInt(10),
+	rm := &common.StubRoundsManager{
+		Round: big.NewInt(10),
 	}
 	orch := NewOrchestrator(n, rm)
 	orch.address = addr
@@ -1144,8 +1144,8 @@ func TestProcessPayment_AcceptablePriceError_IncreasesCredit_ReturnsError(t *tes
 	n.Balances = NewAddressBalances(5 * time.Second)
 	recipient := new(pm.MockRecipient)
 	n.Recipient = recipient
-	rm := &stubRoundsManager{
-		round: big.NewInt(10),
+	rm := &common.StubRoundsManager{
+		Round: big.NewInt(10),
 	}
 	orch := NewOrchestrator(n, rm)
 	orch.address = addr
@@ -1201,8 +1201,8 @@ func TestProcessPayment_UnacceptablePriceError_ReturnsError_DoesNotIncreaseCredi
 	n.Balances = NewAddressBalances(5 * time.Second)
 	recipient := new(pm.MockRecipient)
 	n.Recipient = recipient
-	rm := &stubRoundsManager{
-		round: big.NewInt(10),
+	rm := &common.StubRoundsManager{
+		Round: big.NewInt(10),
 	}
 	orch := NewOrchestrator(n, rm)
 	orch.address = addr
@@ -1353,8 +1353,8 @@ func TestIsActive(t *testing.T) {
 	defer dbraw.Close()
 
 	n, _ := NewLivepeerNode(nil, "", dbh)
-	rm := &stubRoundsManager{
-		round: big.NewInt(10),
+	rm := &common.StubRoundsManager{
+		Round: big.NewInt(10),
 	}
 	orch := NewOrchestrator(n, rm)
 	orch.address = addr
@@ -1364,7 +1364,7 @@ func TestIsActive(t *testing.T) {
 	assert.NoError(err)
 
 	// inactive
-	rm.round = big.NewInt(1000)
+	rm.Round = big.NewInt(1000)
 	ok, err = orch.isActive()
 	assert.False(ok)
 	assert.NoError(err)
@@ -1384,8 +1384,8 @@ func TestSufficientBalance_IsSufficient_ReturnsTrue(t *testing.T) {
 	n.Balances = NewAddressBalances(5 * time.Second)
 	recipient := new(pm.MockRecipient)
 	n.Recipient = recipient
-	rm := &stubRoundsManager{
-		round: big.NewInt(10),
+	rm := &common.StubRoundsManager{
+		Round: big.NewInt(10),
 	}
 	orch := NewOrchestrator(n, rm)
 	orch.address = addr
@@ -1423,8 +1423,8 @@ func TestSufficientBalance_IsNotSufficient_ReturnsFalse(t *testing.T) {
 	n.Balances = NewAddressBalances(5 * time.Second)
 	recipient := new(pm.MockRecipient)
 	n.Recipient = recipient
-	rm := &stubRoundsManager{
-		round: big.NewInt(10),
+	rm := &common.StubRoundsManager{
+		Round: big.NewInt(10),
 	}
 	orch := NewOrchestrator(n, rm)
 	orch.address = addr
@@ -1743,12 +1743,6 @@ func randString() string {
 	}
 	return fmt.Sprintf("%x", x)
 }
-
-type stubRoundsManager struct {
-	round *big.Int
-}
-
-func (s *stubRoundsManager) LastInitializedRound() *big.Int { return s.round }
 
 func tempDBWithOrch(t *testing.T, orch *common.DBOrch) (*common.DB, *sql.DB) {
 	return tempDBWithOrchs(t, []*common.DBOrch{orch})

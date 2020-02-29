@@ -774,6 +774,8 @@ func NewRemoteTranscoderManager(n *LivepeerNode, roundSub func(sink chan<- types
 
 		roundSub: roundSub,
 		eth:      n.Eth,
+
+		quit: make(chan struct{}),
 	}
 }
 
@@ -803,6 +805,51 @@ type RemoteTranscoderManager struct {
 
 	roundSub func(sink chan<- types.Log) event.Subscription
 	eth      eth.LivepeerEthClient
+
+	quit chan struct{}
+}
+
+// StartPayoutLoop starts the RemoteTranscoderManager payout loop
+func (rtm *RemoteTranscoderManager) StartPayoutLoop() {
+	roundEvents := make(chan types.Log, 10)
+	sub := rtm.roundSub(roundEvents)
+	defer sub.Unsubscribe()
+
+	for {
+		select {
+		case <-rtm.quit:
+			return
+		case err := <-sub.Err():
+			glog.Error(err)
+		case <-roundEvents:
+			rtm.payout()
+		}
+	}
+}
+
+// StopPayoutLoop stops the RemoteTranscoderManager payout loop
+func (rtm *RemoteTranscoderManager) StopPayoutLoop() {
+	close(rtm.quit)
+}
+
+func (rtm *RemoteTranscoderManager) payout() {
+	for _, t := range rtm.liveTranscoders {
+		go func() {
+			if err := rtm.payoutTranscoder(t); err != nil {
+				glog.Errorf("error paying out transcoder transcoder=%v err=%v", t.ethereumAddr, err)
+			}
+		}()
+	}
+}
+
+func (rtm *RemoteTranscoderManager) payoutTranscoder(t *RemoteTranscoder) error {
+	bal := t.Balance()
+	err := rtm.eth.SendEth(bal, t.ethereumAddr)
+	if err != nil {
+		return err
+	}
+	t.Debit(bal)
+	return nil
 }
 
 // RegisteredTranscodersCount returns number of registered transcoders

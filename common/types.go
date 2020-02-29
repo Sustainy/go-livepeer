@@ -5,6 +5,8 @@ import (
 	"net/url"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/livepeer/go-livepeer/net"
 )
 
@@ -27,4 +29,5 @@ type OrchestratorStore interface {
 
 type RoundsManager interface {
 	LastInitializedRound() *big.Int
+	Subscribe(sink chan<- types.Log) event.Subscription
 }

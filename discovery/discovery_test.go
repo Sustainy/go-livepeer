@@ -41,7 +41,7 @@ func TestNewDBOrchestratorPoolCache_NilEthClient_ReturnsError(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	pool, err := NewDBOrchestratorPoolCache(ctx, node, &stubRoundsManager{})
+	pool, err := NewDBOrchestratorPoolCache(ctx, node, &common.StubRoundsManager{})
 	assert.Nil(pool)
 	assert.EqualError(err, "could not create DBOrchestratorPoolCache: LivepeerEthClient is nil")
 }
@@ -148,7 +148,7 @@ func TestDBOrchestratorPoolCacheSize(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	emptyPool, err := NewDBOrchestratorPoolCache(ctx, node, &stubRoundsManager{})
+	emptyPool, err := NewDBOrchestratorPoolCache(ctx, node, &common.StubRoundsManager{})
 	require.NoError(err)
 	require.NotNil(emptyPool)
 	assert.Equal(0, emptyPool.Size())
@@ -159,7 +159,7 @@ func TestDBOrchestratorPoolCacheSize(t *testing.T) {
 		dbh.UpdateOrch(ethOrchToDBOrch(o))
 	}
 
-	nonEmptyPool, err := NewDBOrchestratorPoolCache(ctx, node, &stubRoundsManager{})
+	nonEmptyPool, err := NewDBOrchestratorPoolCache(ctx, node, &common.StubRoundsManager{})
 	require.NoError(err)
 	require.NotNil(nonEmptyPool)
 	assert.Equal(len(addresses), nonEmptyPool.Size())
@@ -222,7 +222,7 @@ func TestNewDBOrchestratorPoolCache_GivenListOfOrchs_CreatesPoolCacheCorrectly(t
 
 	sender.On("ValidateTicketParams", mock.Anything).Return(nil).Times(3)
 
-	pool, err := NewDBOrchestratorPoolCache(ctx, node, &stubRoundsManager{})
+	pool, err := NewDBOrchestratorPoolCache(ctx, node, &common.StubRoundsManager{})
 	require.NoError(err)
 	assert.Equal(pool.Size(), 3)
 	orchs, err := pool.GetOrchestrators(pool.Size())
@@ -292,7 +292,7 @@ func TestNewDBOrchestratorPoolCache_TestURLs(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	pool, err := NewDBOrchestratorPoolCache(ctx, node, &stubRoundsManager{})
+	pool, err := NewDBOrchestratorPoolCache(ctx, node, &common.StubRoundsManager{})
 	require.NoError(err)
 	// bad URLs are inserted in the database but are not included in the working set, as there is no returnable query for getting their priceInfo
 	// And if URL is updated it won't be picked up until next cache update
@@ -325,7 +325,7 @@ func TestNewDBOrchestratorPoolCache_TestURLs_Empty(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	pool, err := NewDBOrchestratorPoolCache(ctx, node, &stubRoundsManager{})
+	pool, err := NewDBOrchestratorPoolCache(ctx, node, &common.StubRoundsManager{})
 	require.NoError(err)
 	assert.Equal(0, pool.Size())
 	urls := pool.GetURLs()
@@ -399,7 +399,7 @@ func TestNewDBOrchestorPoolCache_PollOrchestratorInfo(t *testing.T) {
 	origCacheRefreshInterval := cacheRefreshInterval
 	cacheRefreshInterval = 200 * time.Millisecond
 	defer func() { cacheRefreshInterval = origCacheRefreshInterval }()
-	pool, err := NewDBOrchestratorPoolCache(ctx, node, &stubRoundsManager{})
+	pool, err := NewDBOrchestratorPoolCache(ctx, node, &common.StubRoundsManager{})
 	require.NoError(err)
 
 	// Ensure orchestrators exist in DB
@@ -540,7 +540,7 @@ func TestCachedPool_AllOrchestratorsTooExpensive_ReturnsEmptyList(t *testing.T) 
 
 	sender.On("ValidateTicketParams", mock.Anything).Return(nil)
 
-	pool, err := NewDBOrchestratorPoolCache(ctx, node, &stubRoundsManager{})
+	pool, err := NewDBOrchestratorPoolCache(ctx, node, &common.StubRoundsManager{})
 	require.NoError(err)
 
 	// ensuring orchs exist in DB
@@ -628,7 +628,7 @@ func TestCachedPool_GetOrchestrators_MaxBroadcastPriceNotSet(t *testing.T) {
 
 	sender.On("ValidateTicketParams", mock.Anything).Return(nil)
 
-	pool, err := NewDBOrchestratorPoolCache(ctx, node, &stubRoundsManager{})
+	pool, err := NewDBOrchestratorPoolCache(ctx, node, &common.StubRoundsManager{})
 	require.NoError(err)
 
 	// ensuring orchs exist in DB
@@ -732,7 +732,7 @@ func TestCachedPool_N_OrchestratorsGoodPricing_ReturnsNOrchestrators(t *testing.
 
 	sender.On("ValidateTicketParams", mock.Anything).Return(nil)
 
-	pool, err := NewDBOrchestratorPoolCache(ctx, node, &stubRoundsManager{})
+	pool, err := NewDBOrchestratorPoolCache(ctx, node, &common.StubRoundsManager{})
 	require.NoError(err)
 
 	// ensuring orchs exist in DB
@@ -815,7 +815,7 @@ func TestCachedPool_GetOrchestrators_TicketParamsValidation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	pool, err := NewDBOrchestratorPoolCache(ctx, node, &stubRoundsManager{})
+	pool, err := NewDBOrchestratorPoolCache(ctx, node, &common.StubRoundsManager{})
 	require.NoError(err)
 
 	// Test 25 out of 50 orchs pass ticket params validation
@@ -908,7 +908,7 @@ func TestCachedPool_GetOrchestrators_OnlyActiveOrchestrators(t *testing.T) {
 
 	sender.On("ValidateTicketParams", mock.Anything).Return(nil)
 
-	pool, err := NewDBOrchestratorPoolCache(ctx, node, &stubRoundsManager{round: big.NewInt(24)})
+	pool, err := NewDBOrchestratorPoolCache(ctx, node, &common.StubRoundsManager{Round: big.NewInt(24)})
 	require.NoError(err)
 
 	// ensuring orchs exist in DB
