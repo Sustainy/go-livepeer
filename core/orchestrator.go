@@ -14,7 +14,9 @@ import (
 	"time"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 
@@ -760,7 +762,7 @@ func NewRemoteTranscoder(m *RemoteTranscoderManager, stream net.Transcoder_Regis
 	}
 }
 
-func NewRemoteTranscoderManager(getBasePrice func() *big.Rat) *RemoteTranscoderManager {
+func NewRemoteTranscoderManager(n *LivepeerNode, roundSub func(sink chan<- types.Log) event.Subscription) *RemoteTranscoderManager {
 	return &RemoteTranscoderManager{
 		remoteTranscoders: []*RemoteTranscoder{},
 		liveTranscoders:   map[net.Transcoder_RegisterTranscoderServer]*RemoteTranscoder{},
@@ -768,7 +770,10 @@ func NewRemoteTranscoderManager(getBasePrice func() *big.Rat) *RemoteTranscoderM
 
 		taskMutex:    &sync.RWMutex{},
 		taskChans:    make(map[int64]TranscoderChan),
-		getBasePrice: getBasePrice,
+		getBasePrice: n.GetBasePrice,
+
+		roundSub: roundSub,
+		eth:      n.Eth,
 	}
 }
 
@@ -795,6 +800,9 @@ type RemoteTranscoderManager struct {
 	taskCount int64
 
 	getBasePrice func() *big.Rat
+
+	roundSub func(sink chan<- types.Log) event.Subscription
+	eth      eth.LivepeerEthClient
 }
 
 // RegisteredTranscodersCount returns number of registered transcoders

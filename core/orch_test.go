@@ -70,7 +70,7 @@ func TestCurrentBlock(t *testing.T) {
 
 func TestServeTranscoder(t *testing.T) {
 	n, _ := NewLivepeerNode(nil, "", nil)
-	n.TranscoderManager = NewRemoteTranscoderManager(nil)
+	n.TranscoderManager = NewRemoteTranscoderManager(n, nil)
 	strm := &StubTranscoderServer{}
 
 	// test that a transcoder was created
@@ -97,7 +97,8 @@ func TestServeTranscoder(t *testing.T) {
 }
 
 func TestRemoteTranscoder(t *testing.T) {
-	m := NewRemoteTranscoderManager(nil)
+	n, _ := NewLivepeerNode(nil, "", nil)
+	m := NewRemoteTranscoderManager(n, nil)
 	ethAddr := ethcommon.HexToAddress("foo")
 	initTranscoder := func() (*RemoteTranscoder, *StubTranscoderServer) {
 		strm := &StubTranscoderServer{manager: m}
@@ -172,7 +173,9 @@ func wgWait2(wg *sync.WaitGroup, dur time.Duration) bool {
 }
 
 func TestManageTranscoders(t *testing.T) {
-	m := NewRemoteTranscoderManager(nil)
+	n, _ := NewLivepeerNode(nil, "", nil)
+	n.priceInfo = big.NewRat(1, 1)
+	m := NewRemoteTranscoderManager(n, nil)
 	strm := &StubTranscoderServer{}
 	strm2 := &StubTranscoderServer{manager: m}
 
@@ -236,7 +239,9 @@ func TestManageTranscoders(t *testing.T) {
 }
 
 func TestSelectTranscoder(t *testing.T) {
-	m := NewRemoteTranscoderManager(nil)
+	n, _ := NewLivepeerNode(nil, "", nil)
+	n.priceInfo = big.NewRat(1, 1)
+	m := NewRemoteTranscoderManager(n, nil)
 	strm := &StubTranscoderServer{manager: m, WithholdResults: false}
 	strm2 := &StubTranscoderServer{manager: m}
 
@@ -307,10 +312,9 @@ func TestSelectTranscoder(t *testing.T) {
 }
 
 func TestTranscoderManagerTranscoding(t *testing.T) {
-	getBasePrice := func() *big.Rat {
-		return big.NewRat(1, 1)
-	}
-	m := NewRemoteTranscoderManager(getBasePrice)
+	n, _ := NewLivepeerNode(nil, "", nil)
+	n.priceInfo = big.NewRat(1, 1)
+	m := NewRemoteTranscoderManager(n, nil)
 	s := &StubTranscoderServer{manager: m}
 
 	// sanity checks
@@ -382,40 +386,42 @@ func TestTranscoderManagerTranscoding(t *testing.T) {
 }
 
 func TestTaskChan(t *testing.T) {
-	n := NewRemoteTranscoderManager(nil)
+	n, _ := NewLivepeerNode(nil, "", nil)
+	n.priceInfo = big.NewRat(1, 1)
+	m := NewRemoteTranscoderManager(n, nil)
 	// Sanity check task ID
-	if n.taskCount != 0 {
+	if m.taskCount != 0 {
 		t.Error("Unexpected taskid")
 	}
-	if len(n.taskChans) != int(n.taskCount) {
+	if len(m.taskChans) != int(m.taskCount) {
 		t.Error("Unexpected task chan length")
 	}
 
 	// Adding task chans
 	const MaxTasks = 1000
 	for i := 0; i < MaxTasks; i++ {
-		go n.addTaskChan() // hopefully concurrently...
+		go m.addTaskChan() // hopefully concurrently...
 	}
 	for j := 0; j < 10; j++ {
-		n.taskMutex.RLock()
-		tid := n.taskCount
-		n.taskMutex.RUnlock()
+		m.taskMutex.RLock()
+		tid := m.taskCount
+		m.taskMutex.RUnlock()
 		if tid >= MaxTasks {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	if n.taskCount != MaxTasks {
+	if m.taskCount != MaxTasks {
 		t.Error("Time elapsed")
 	}
-	if len(n.taskChans) != int(n.taskCount) {
+	if len(m.taskChans) != int(m.taskCount) {
 		t.Error("Unexpected task chan length")
 	}
 
 	// Accessing task chans
 	existingIds := []int64{0, 1, MaxTasks / 2, MaxTasks - 2, MaxTasks - 1}
 	for _, id := range existingIds {
-		_, err := n.getTaskChan(int64(id))
+		_, err := m.getTaskChan(int64(id))
 		if err != nil {
 			t.Error("Unexpected error getting task chan for ", id, err)
 		}
@@ -423,7 +429,7 @@ func TestTaskChan(t *testing.T) {
 	missingIds := []int64{-1, MaxTasks}
 	testNonexistentChans := func(ids []int64) {
 		for _, id := range ids {
-			_, err := n.getTaskChan(int64(id))
+			_, err := m.getTaskChan(int64(id))
 			if err == nil || err.Error() != "No transcoder channel" {
 				t.Error("Did not get expected error for ", id, err)
 			}
@@ -433,18 +439,18 @@ func TestTaskChan(t *testing.T) {
 
 	// Removing task chans
 	for i := 0; i < MaxTasks; i++ {
-		go n.removeTaskChan(int64(i)) // hopefully concurrently...
+		go m.removeTaskChan(int64(i)) // hopefully concurrently...
 	}
 	for j := 0; j < 10; j++ {
-		n.taskMutex.RLock()
-		tlen := len(n.taskChans)
-		n.taskMutex.RUnlock()
+		m.taskMutex.RLock()
+		tlen := len(m.taskChans)
+		m.taskMutex.RUnlock()
 		if tlen <= 0 {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	if len(n.taskChans) != 0 {
+	if len(m.taskChans) != 0 {
 		t.Error("Time elapsed")
 	}
 	testNonexistentChans(existingIds) // sanity check for removal

@@ -250,10 +250,12 @@ func main() {
 		}
 	}
 
+	var roundsWatcher *watchers.RoundsWatcher
+
 	if *orchestrator {
 		n.NodeType = core.OrchestratorNode
 		if !*transcoder {
-			n.TranscoderManager = core.NewRemoteTranscoderManager(n.GetBasePrice)
+			n.TranscoderManager = core.NewRemoteTranscoderManager(n, roundsWatcher.Subscribe)
 			n.Transcoder = n.TranscoderManager
 		}
 	} else if *transcoder {
@@ -295,7 +297,6 @@ func main() {
 	}
 
 	watcherErr := make(chan error)
-	var roundsWatcher *watchers.RoundsWatcher
 	if *network == "offchain" {
 		glog.Infof("***Livepeer is in off-chain mode***")
 
