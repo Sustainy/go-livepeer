@@ -834,16 +834,19 @@ func (rtm *RemoteTranscoderManager) StopPayoutLoop() {
 
 func (rtm *RemoteTranscoderManager) payout() {
 	for _, t := range rtm.liveTranscoders {
-		go func() {
+		go func(t *RemoteTranscoder) {
 			if err := rtm.payoutTranscoder(t); err != nil {
 				glog.Errorf("error paying out transcoder transcoder=%v err=%v", t.ethereumAddr, err)
 			}
-		}()
+		}(t)
 	}
 }
 
 func (rtm *RemoteTranscoderManager) payoutTranscoder(t *RemoteTranscoder) error {
 	bal := t.Balance()
+	if bal == nil || bal.Cmp(big.NewInt(0)) <= 0 {
+		return nil
+	}
 	err := rtm.eth.SendEth(bal, t.ethereumAddr)
 	if err != nil {
 		return err

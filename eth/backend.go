@@ -84,9 +84,15 @@ func (b *backend) SendTransaction(ctx context.Context, tx *types.Transaction) er
 	b.nonceManager.Unlock(sender)
 
 	data := tx.Data()
-	method, ok := b.methods[string(data[:4])]
-	if !ok {
-		method = "unknown"
+	var method string
+	if data == nil {
+		method = ""
+	} else {
+		var ok bool
+		method, ok = b.methods[string(data[:4])]
+		if !ok {
+			method = "unknown"
+		}
 	}
 
 	if err != nil {
